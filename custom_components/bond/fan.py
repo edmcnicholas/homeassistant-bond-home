@@ -4,6 +4,7 @@ from homeassistant.components.fan import (
     SPEED_LOW,
     SPEED_MEDIUM,
     SPEED_HIGH,
+    SPEED_OFF,
     FanEntity
 )
 
@@ -43,6 +44,7 @@ class BondFan(FanEntity):
         self._properties = properties
         self._name = device['name']
         self._state = None
+        self._speed = None
         self._speed_list = []
 
         if BOND_DEVICE_ACTION_SET_SPEED in self._device['actions']:
@@ -54,6 +56,16 @@ class BondFan(FanEntity):
                     self._speed_medium = (self._speed_high + 1) // 2
                     self._speed_list.append(SPEED_MEDIUM)
                 self._speed_list.append(SPEED_HIGH)
+                
+        self.update()
+                
+    @property
+    def speed(self) -> str:
+        """Return the current speed."""
+        if self._state:
+            return self._speed
+        else:
+             return SPEED_OFF
 
     @property
     def name(self):
@@ -92,10 +104,13 @@ class BondFan(FanEntity):
         """Set the speed of the fan."""
         if speed == SPEED_HIGH:
             self._bond.setSpeed(self._deviceId, self._speed_high)
+            self._speed = SPEED_HIGH
         elif speed == SPEED_MEDIUM:
             self._bond.setSpeed(self._deviceId, self._speed_medium)
+            self._speed = SPEED_MEDIUM
         elif speed == SPEED_LOW:
             self._bond.setSpeed(self._deviceId, self._speed_low)
+            self._speed = SPEED_LOW
 
     def update(self):
         """Fetch new state data for this fan
@@ -104,6 +119,15 @@ class BondFan(FanEntity):
         bondState = self._bond.getDeviceState(self._deviceId)
         if 'power' in bondState:
             self._state = True if bondState['power'] == 1 else False
+        if 'speed' in bondState:
+            if bondState['speed'] == self._speed_high:
+                self._speed = SPEED_HIGH
+            elif  bondState['speed'] > self._speed_low:
+                self._speed = SPEED_MEDIUM
+            elif bondState['speed'] > 0:
+                self._speed = SPEED_LOW
+            else:
+                self._speed = SPEED_OFF
 
     @property
     def unique_id(self):
